@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 
 	"gioui.org/app"
@@ -15,55 +16,73 @@ import (
 
 func main() {
 	go func() {
-		// create new window
+		// create new window and defines the starting Size, min and max of that window.
 		w := app.NewWindow(
 			app.Title("Egg timer"),
 			app.Size(unit.Dp(400), unit.Dp(600)),
+			app.MinSize(unit.Dp(300), unit.Dp(400)),
+			app.MaxSize(unit.Dp(600), unit.Dp(800)),
 		)
-
-		// ops are the operations from the UI
-		var ops op.Ops
-
-		// startButton is a clickable widget
-		var startButton widget.Clickable
-
-		// th defines the material design style
-		th := material.NewTheme(gofont.Collection())
-
-		// listen for events in the window.
-		for e := range w.Events() {
-
-			// detect what type of event
-			switch e := e.(type) {
-
-			// this is sent when the application should re-render.
-			case system.FrameEvent:
-				gtx := layout.NewContext(&ops, e)
-				// Let's try out the flexbox layout:
-				layout.Flex{
-					// Vertical alignment, from top to bottom
-					Axis: layout.Vertical,
-					// Empty space is left at the start, i.e. at the top
-					Spacing: layout.SpaceStart,
-				}.Layout(gtx,
-					// We insert two rigid elements:
-					// First one to hold a button ...
-					layout.Rigid(
-						func(gtx layout.Context) layout.Dimensions {
-							btn := material.Button(th, &startButton, "Start")
-							return btn.Layout(gtx)
-						},
-					),
-					// ... then one to hold an empty spacer
-					layout.Rigid(
-						// The height of the spacer is 25 Device independent pixels
-						layout.Spacer{Height: unit.Dp(25)}.Layout,
-					),
-				)
-				e.Frame(gtx.Ops)
-			}
+		if err := draw(w); err != nil {
+			log.Fatal(err)
 		}
 		os.Exit(0)
 	}()
 	app.Main()
+}
+
+type C = layout.Context
+type D = layout.Dimensions
+
+func draw(w *app.Window) error {
+
+	// ops are the operations from the UI
+	var ops op.Ops
+
+	// startButton is a clickable widget
+	var startButton widget.Clickable
+
+	// th defines the material design style
+	th := material.NewTheme(gofont.Collection())
+
+	// listen for events in the window.
+	for e := range w.Events() {
+
+		// detect what type of event
+		switch e := e.(type) {
+
+		// this is sent when the application should re-render.
+		case system.FrameEvent:
+			gtx := layout.NewContext(&ops, e)
+			layout.Flex{
+				Axis:    layout.Vertical,
+				Spacing: layout.SpaceStart,
+			}.Layout(gtx,
+				layout.Rigid(
+					func(gtx C) D {
+						//ONE: First define the Fixed margins around the button using layout.Inset
+						margins := layout.Inset{
+							Top:    unit.Dp(25),
+							Bottom: unit.Dp(25),
+							Right:  unit.Dp(35),
+							Left:   unit.Dp(35),
+						}
+
+						return margins.Layout(gtx,
+							//Three: and finally within the margins we built before, add a button.
+							func(gtx C) D {
+								btn := material.Button(th, &startButton, "Start The Timer")
+								return btn.Layout(gtx)
+							},
+						)
+					},
+				))
+			e.Frame(gtx.Ops)
+
+		// this is sent when the application is closed.
+		case system.DestroyEvent:
+			return e.Err
+		}
+	}
+	return nil
 }
