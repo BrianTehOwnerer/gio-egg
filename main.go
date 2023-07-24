@@ -1,7 +1,15 @@
 package main
 
 import (
+	"image"
+	"image/color"
+	"log"
+	"math"
+	"os"
+	"time"
+
 	"gioui.org/app"
+	"gioui.org/f32"
 	"gioui.org/font/gofont"
 	"gioui.org/io/system"
 	"gioui.org/layout"
@@ -11,11 +19,6 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
-	"image"
-	"image/color"
-	"log"
-	"os"
-	"time"
 )
 
 // Define the progress variables, a channel and a variable
@@ -37,8 +40,8 @@ func main() {
 		w := app.NewWindow(
 			app.Title("Egg timer"),
 			app.Size(unit.Dp(400), unit.Dp(600)),
+			app.MaxSize(unit.Dp(600), unit.Dp(800)),
 			app.MinSize(unit.Dp(300), unit.Dp(400)),
-			app.MaxSize(unit.Dp(800), unit.Dp(1000)),
 		)
 		if err := draw(w); err != nil {
 			log.Fatal(err)
@@ -87,26 +90,58 @@ func draw(w *app.Window) error {
 					// Empty space is left at the start, i.e. at the top
 					Spacing: layout.SpaceStart,
 				}.Layout(gtx,
+
 					layout.Rigid(
 						func(gtx C) D {
-							circle := clip.Ellipse{
-								//Hard coding the X cordinate
-								//Min: image.Pt(80, 0),
-								//Max: image.Pt(320, 240),
-								//Softcodeing the x cord
-								Min: image.Pt(gtx.Constraints.Max.X/2-120, 0),
-								Max: image.Pt(gtx.Constraints.Max.X/2+120, 240),
-							}.Op(gtx.Ops)
-							color := color.NRGBA{R: 200, A: 255}
-							paint.FillShape(gtx.Ops, color, circle)
-							d := image.Point{Y: 400}
+							// Draw a custom path, shaped like an egg
+							var eggPath clip.Path
+							op.Offset(image.Pt(gtx.Dp(200), gtx.Dp(150))).Add(gtx.Ops)
+							eggPath.Begin(gtx.Ops)
+							// Rotate from 0 to 360 degrees
+							for deg := 0.0; deg <= 360; deg++ {
+
+								// Egg math (really) at this brilliant site. Thanks!
+								// https://observablehq.com/@toja/egg-curve
+								// Convert degrees to radians
+								rad := deg / 360 * 2 * math.Pi
+								// Trig gives the distance in X and Y direction
+								cosT := math.Cos(rad)
+								sinT := math.Sin(rad)
+								// Constants to define the eggshape
+								a := 110.0
+								b := 150.0
+								d := 20.0
+								// The x/y coordinates
+								x := a * cosT
+								y := -(math.Sqrt(b*b-d*d*cosT*cosT) + d*sinT) * sinT
+								// Finally the point on the outline
+								p := f32.Pt(float32(x), float32(y))
+								// Draw the line to this point
+								eggPath.LineTo(p)
+							}
+							// Close the path
+							eggPath.Close()
+
+							// Get hold of the actual clip
+							eggArea := clip.Outline{Path: eggPath.End()}.Op()
+
+							// Fill the shape
+							// color := color.NRGBA{R: 255, G: 239, B: 174, A: 255}
+							color := color.NRGBA{R: 255, G: uint8(239 * (1 - progress)), B: uint8(174 * (1 - progress)), A: 255}
+							paint.FillShape(gtx.Ops, color, eggArea)
+
+							d := image.Point{Y: 375}
 							return layout.Dimensions{Size: d}
-						}), layout.Rigid(
+						},
+					),
+
+					layout.Rigid(
 						func(gtx C) D {
 							bar := material.ProgressBar(th, progress)
 							return bar.Layout(gtx)
 						},
 					),
+
 					layout.Rigid(
 						func(gtx C) D {
 							// We start by defining a set of margins
@@ -122,9 +157,9 @@ func draw(w *app.Window) error {
 								func(gtx C) D {
 									var text string
 									if !boiling {
-										text = "Start the timer"
+										text = "Start"
 									} else {
-										text = "Pause the timer"
+										text = "Stop"
 									}
 									btn := material.Button(th, &startButton, text)
 									return btn.Layout(gtx)
