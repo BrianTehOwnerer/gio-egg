@@ -1,11 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"log"
 	"math"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"gioui.org/app"
@@ -16,6 +19,7 @@ import (
 	"gioui.org/op"
 	"gioui.org/op/clip"
 	"gioui.org/op/paint"
+	"gioui.org/text"
 	"gioui.org/unit"
 	"gioui.org/widget"
 	"gioui.org/widget/material"
@@ -56,6 +60,9 @@ type C = layout.Context
 type D = layout.Dimensions
 
 func draw(w *app.Window) error {
+	var boilDurationInput widget.Editor
+	var boilDuration float32
+
 	// ops are the operations from the UI
 	var ops op.Ops
 
@@ -82,6 +89,18 @@ func draw(w *app.Window) error {
 				// Let's try out the flexbox layout concept
 				if startButton.Clicked() {
 					boiling = !boiling
+
+					//reset the boil
+					if progress >= 1 {
+						progress = 0
+					}
+
+					//here we read from the input box
+					inputString := boilDurationInput.Text()
+					inputString = strings.TrimSpace(inputString)
+					inputFloat, _ := strconv.ParseFloat(inputString, 32)
+					boilDuration = float32(inputFloat)
+					boilDuration = boilDuration / (1 - progress)
 				}
 
 				layout.Flex{
@@ -134,14 +153,47 @@ func draw(w *app.Window) error {
 							return layout.Dimensions{Size: d}
 						},
 					),
+					layout.Rigid(
+						func(gtx C) D {
+							ed := material.Editor(th, &boilDurationInput, "sec")
 
+							boilDurationInput.SingleLine = true
+							boilDurationInput.Alignment = text.Middle
+							if boiling && progress < 1 {
+								boilRemain := (1 - progress) * boilDuration
+								//formatting to make things look nice, using the
+								// multiply by 10 devide by 10 trick
+								inputStr := fmt.Sprintf("%.1f", math.Round(float64(boilRemain)*10)/10)
+								//update the text inside of the input box
+								boilDurationInput.SetText(inputStr)
+							}
+
+							//layouts for the text box
+							margins := layout.Inset{
+								Top:    unit.Dp(0),
+								Right:  unit.Dp(170),
+								Bottom: unit.Dp(40),
+								Left:   unit.Dp(170),
+							}
+							border := widget.Border{
+								Color:        color.NRGBA{R: 204, G: 204, B: 204, A: 255},
+								CornerRadius: unit.Dp(3),
+								Width:        unit.Dp(2),
+							}
+							return margins.Layout(gtx,
+								func(gtx C) D {
+									return border.Layout(gtx, ed.Layout)
+								})
+						},
+					),
+					//Progress Bar happens here
 					layout.Rigid(
 						func(gtx C) D {
 							bar := material.ProgressBar(th, progress)
 							return bar.Layout(gtx)
 						},
 					),
-
+					//this is the bounding box for the start button
 					layout.Rigid(
 						func(gtx C) D {
 							// We start by defining a set of margins
