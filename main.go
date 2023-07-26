@@ -163,7 +163,7 @@ func draw(w *app.Window) error {
 								boilRemain := (1 - progress) * boilDuration
 								//formatting to make things look nice, using the
 								// multiply by 10 devide by 10 trick
-								inputStr := fmt.Sprintf("%.1f", math.Round(float64(boilRemain)*10)/10)
+								inputStr := fmt.Sprintf("%.1f", math.Round(math.Abs(float64(boilRemain)*10))/10)
 								//update the text inside of the input box
 								boilDurationInput.SetText(inputStr)
 							}
@@ -234,7 +234,7 @@ func draw(w *app.Window) error {
 		// listen for events in the incrementor channel
 		case <-progressIncrementer:
 			if boiling && progress < 1 {
-				progress += 1.0 / 25.0 / boilDuration
+				progress += float32(1.0 / 25.0 / math.Abs(float64(boilDuration)))
 				if progress >= 1 {
 					progress = 1
 				}
